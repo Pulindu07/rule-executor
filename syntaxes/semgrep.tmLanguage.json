@@ -1,0 +1,48 @@
+{
+    "scopeName": "source.semgrep",
+    "patterns": [
+        {
+            "include": "#rule"
+        }
+    ],
+    "repository": {
+        "rule": {
+            "patterns": [
+                {
+                    "match": "^\\s*(rules):",
+                    "name": "keyword.control.semgrep.root"  
+                },
+                {
+                    "match": "^\\s*(- id|- pattern|- patterns|pattern-either|pattern-regex|message|severity|languages|paths|fix|metadata|timeout|focus):",
+                    "name": "keyword.control.semgrep.rule"  
+                },
+                {
+                    "match": "\\b(INFO|WARNING|ERROR)\\b",
+                    "name": "constant.language.semgrep"  
+                },
+                {
+                    "match": "\\$[A-Z][A-Z0-9_]*",
+                    "name": "variable.other.metavariable.semgrep"  
+                },
+                {
+                    "begin": "\"",
+                    "end": "\"",
+                    "name": "string.quoted.double.semgrep"  
+                },
+                {
+                    "begin": "'",
+                    "end": "'",
+                    "name": "string.quoted.single.semgrep"  
+                },
+                {
+                    "match": "(python|javascript|java|go|ruby|php|c|cpp|csharp)\\b",
+                    "name": "constant.language.semgrep.language"  
+                },
+                {
+                    "match": "\\b(pattern-inside|pattern-not|pattern-where|focus-metavariable):",
+                    "name": "keyword.control.semgrep.pattern"  
+                }
+            ]
+        }
+    }
+}
