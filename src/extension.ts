@@ -6,10 +6,17 @@ import * as axios from 'axios';
 let ruleFile: string | null = null;
 let testFiles: string[] = [];
 
-// Encode file content to base64
-const encodeFileToBase64 = (filePath: string): string => {
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    return Buffer.from(fileContent).toString('base64');
+// Encode file content to base64 (asynchronously)
+const encodeFileToBase64 = (filePath: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(Buffer.from(data).toString('base64'));
+            }
+        });
+    });
 };
 
 // Function to create Webview with buttons
@@ -18,12 +25,11 @@ const createWebviewPanel = (context: vscode.ExtensionContext) => {
         'testRunnerPanel',
         'Test Runner',
         vscode.ViewColumn.One,
-        { enableScripts: true } // Enables JavaScript execution inside the webview
+        { enableScripts: true }
     );
 
     panel.webview.html = getWebviewContent();
 
-    // Handle messages from the webview
     panel.webview.onDidReceiveMessage(async message => {
         switch (message.command) {
             case 'importRule':
@@ -57,11 +63,14 @@ const createWebviewPanel = (context: vscode.ExtensionContext) => {
                 }
 
                 try {
-                    const ruleBase64 = encodeFileToBase64(ruleFile);
-                    const testsBase64 = testFiles.map(testFile => ({
-                        fileName: path.basename(testFile),
-                        fileEncoded: encodeFileToBase64(testFile)
-                    }));
+                    // Ensure Base64 encoding finishes before making the API request
+                    const ruleBase64 = await encodeFileToBase64(ruleFile);
+                    const testsBase64 = await Promise.all(
+                        testFiles.map(async testFile => ({
+                            fileName: path.basename(testFile),
+                            fileEncoded: await encodeFileToBase64(testFile)
+                        }))
+                    );
 
                     // Prepare the request body according to the required structure
                     const requestBody = {
@@ -72,13 +81,33 @@ const createWebviewPanel = (context: vscode.ExtensionContext) => {
                         tests: testsBase64
                     };
 
-					console.log("Request: ", requestBody);
+                    console.log("Request: ", requestBody);
 
-                    // Make the POST request to the new URL
+                    // Make the POST request to the API
                     const response = await axios.default.post('http://4.227.147.247:8080/runRule', requestBody);
 
+                    // Highlight specific lines and columns in the test file
+                    const testUri = vscode.Uri.file(testFiles[0]); // Assuming you want to highlight the first test file
+                    const document = await vscode.workspace.openTextDocument(testUri);
+                    const editor = await vscode.window.showTextDocument(document, vscode.ViewColumn.Two);
+
+                    // Create a decoration for the range
+                    const highlightDecoration = vscode.window.createTextEditorDecorationType({
+                        backgroundColor: 'yellow', // Highlight color
+                    });
+
+                    // Define the range to highlight (Line numbers are zero-based)
+                    const startPos = new vscode.Position(13, 12);  // Line 14, Column 1
+                    const endPos = new vscode.Position(13, 100);   // Line 14, Column 10
+                    const highlightRange = new vscode.Range(startPos, endPos);
+
+                    // Apply the decoration to the editor
+                    editor.setDecorations(highlightDecoration, [highlightRange]);
+
+                    
+
                     // Console log the response from the API
-                    console.log("Response from API:", response.data);
+                    console.log("Response from API:", response.data.results);
                     vscode.window.showInformationMessage("Test run successful.");
 
                 } catch (error: any) {
@@ -89,6 +118,7 @@ const createWebviewPanel = (context: vscode.ExtensionContext) => {
         }
     });
 };
+
 
 // Webview HTML content
 const getWebviewContent = (): string => {
